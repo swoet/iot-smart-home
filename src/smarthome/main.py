@@ -20,12 +20,21 @@ def serve(
     reload: bool = typer.Option(False, help="Auto-reload on code changes"),
 ):
     """Run the API server with web dashboard."""
-    uvicorn.run(
-        fastapi_app,
-        host=host,
-        port=port,
-        reload=reload,
-    )
+    # uvicorn requires an import string for reload/workers
+    if reload:
+        uvicorn.run(
+            "smarthome.api:app",
+            host=host,
+            port=port,
+            reload=True,
+            factory=False,
+        )
+    else:
+        uvicorn.run(
+            fastapi_app,
+            host=host,
+            port=port,
+        )
 
 
 @app.command()
