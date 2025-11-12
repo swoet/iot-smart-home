@@ -27,3 +27,6 @@ build/
 
 # Local data
 smarthome.db
+
+# Packaging metadata
+*.egg-info/

@@ -31,6 +31,10 @@ A production‑grade, multi‑room smart home simulator with real‑time dashboa
       └───────────────────────────────────────────────────────────────────────┘
 ```
 
+UI screenshot
+
+![Dashboard](Screenshot%20Of%20The%20UI.png)
+
 Mermaid architecture
 ```mermaid
 flowchart LR
