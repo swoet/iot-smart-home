@@ -5,61 +5,43 @@
 A production‑grade, multi‑room smart home simulator with real‑time dashboard, WebSocket streaming, rules editor, and persistent history.
 
 
-3D visual overview
-```
-      ____   ____   ____                 ______  __   __
-     / __ \ / __ \ / __ \   ___  ____  / __/ / / /  / /
-    / / / // / / // / / /  / _ \/ __/ _\ \/ /_/ /  / / 
-   / /_/ // /_/ // /_/ /  / , _/ /__ /__/\____/  /_/  
-  /_____/ \____/ \____/  /_/|_|\___/  smart home sim
+Visual overview
+```mermaid
+flowchart LR
+  %% Styling
+  classDef ui fill:#0f172a,stroke:#0b1220,color:#fff,rx:6,ry:6
+  classDef api fill:#0284c7,stroke:#075985,color:#fff,rx:6,ry:6
+  classDef engine fill:#10b981,stroke:#047857,color:#062,rx:6,ry:6
+  classDef db fill:#f59e0b,stroke:#b45309,color:#111,rx:6,ry:6
 
-      ┌──────────────────────── Isometric Architecture ────────────────────────┐
-      │                                                                        │
-      │    ┌───────────┐        WS (JSON events)        ┌─────────────────┐   │
-      │    │  Browser  │◀──────────────────────────────▶│  FastAPI + WS   │   │
-      │    │  Dashboard│        REST (GET/POST)         │  /api + /ws     │   │
-      │    └─────┬─────┘                                  └──────┬────────┘   │
-      │          │                                              │            │
-      │          │                                              │            │
-      │    ┌─────▼─────┐    periodic sensor ticks     ┌─────────▼────────┐   │
-      │    │  Charts   │◀────────────────────────────▶│  Async Simulation │   │
-      │    │  Controls │  rules, env dynamics, actuators  rooms:{...}    │   │
-      │    └─────┬─────┘                                   └─────┬────────┘   │
-      │          │                                               │            │
-      │   export ▼                                               ▼ events     │
-      │    CSV/JSON                                   SQLite event store      │
-      └───────────────────────────────────────────────────────────────────────┘
+  subgraph B[Browser Dashboard]
+    Charts[Charts]:::ui
+    Controls[Controls]:::ui
+    RulesEditor[Rules Editor]:::ui
+  end
+  subgraph A[FastAPI Server]
+    REST[/REST /api/*/]:::api
+    WS((WebSocket /ws)):::api
+  end
+  subgraph E[Simulation Engine]
+    SimCore([Core]):::engine
+    Rooms[[Rooms: living<br/>bedroom<br/>kitchen]]:::engine
+    Env{{Environment dynamics}}:::engine
+    RuleCfg[(Per-room Rules)]:::engine
+  end
+  DB[(SQLite Event Store)]:::db
+
+  Charts -- subscribe --> WS
+  Controls -- POST --> REST
+  RulesEditor -- GET/PUT --> REST
+  REST <--> SimCore
+  SimCore --> DB
+  DB -.history.-> REST
 ```
 
 UI screenshot
 
 ![Dashboard](Screenshot%20Of%20The%20UI.png)
-
-Mermaid architecture
-```mermaid
-flowchart LR
-  subgraph UI[Browser Dashboard]
-    D[Charts + Controls]
-    R[Rules Editor]
-  end
-  subgraph API[FastAPI Server]
-    S[(WebSocket /ws)]
-    E[/REST /api/*/]
-  end
-  subgraph SIM[Async Simulation]
-    Rooms[Rooms: living, bedroom, kitchen]
-    Rules[Per-room Rules]
-  end
-  DB[(SQLite Event Store)]
-
-  D <--> S
-  D <--> E
-  R <--> E
-  E <--> SIM
-  SIM --> DB
-  DB -.history.-> E
-```
-
 
 Features
 - Multi-room engine: living, bedroom, kitchen (humidity + smart plug)
