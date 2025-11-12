@@ -1,0 +1,10 @@
+# Simulation and automation thresholds
+# Adjust and restart the server to apply.
+temp_high: 25.0        # °C threshold for fan ON
+light_dark: 30.0       # % threshold for darkness
+motion_light_on_seconds: 120
+
+# Sensor tick intervals (seconds)
+tick_temp: 2.0
+tick_light: 3.0
+tick_motion: 1.0
