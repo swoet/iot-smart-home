@@ -7,7 +7,7 @@ from collections import deque
 from typing import Any, Deque, Dict, List, Optional
 
 from .config import Config, load_config
-from .models import Fan, LightBulb, MotionSensor, Sensor, TemperatureSensor, LightSensor, Thermostat, Room, Reading
+from .models import Fan, LightBulb, MotionSensor, Sensor, TemperatureSensor, LightSensor, Thermostat, Room, Reading, HumiditySensor, SmartPlug
 from .storage import EventStore
 from .rules import Rules
 from . import __version__
@@ -78,6 +78,21 @@ class Simulation:
                     "thermostat": Thermostat(id="thermostat", name="Thermostat", kind="actuator", state={"setpoint": 23.5, "ts": time.time()}),
                 },
             ),
+            "kitchen": Room(
+                id="kitchen",
+                name="Kitchen",
+                env={"temp": 24.5, "light": 38.0, "motion_prob": 0.10, "humidity": 50.0},
+                sensors={
+                    "temp": TemperatureSensor(id="temp", name="Temperature", kind="sensor", metric="temperature"),
+                    "light": LightSensor(id="light", name="Light", kind="sensor", metric="light"),
+                    "motion": MotionSensor(id="motion", name="Motion", kind="sensor", metric="motion"),
+                    "humidity": HumiditySensor(id="humidity", name="Humidity", kind="sensor", metric="humidity"),
+                },
+                actuators={
+                    "lightbulb": LightBulb(id="lightbulb", name="Lightbulb", kind="actuator", state={"on": False, "ts": time.time()}),
+                    "plug": SmartPlug(id="plug", name="Smart Plug", kind="actuator", state={"on": False, "ts": time.time()}),
+                },
+            ),
         }
         # Initialize histories
         for room in self.rooms.values():
@@ -140,6 +155,8 @@ class Simulation:
             self._tasks.append(asyncio.create_task(self._sensor_loop(rid, "temp", self.cfg.tick_temp)))
             self._tasks.append(asyncio.create_task(self._sensor_loop(rid, "light", self.cfg.tick_light)))
             self._tasks.append(asyncio.create_task(self._sensor_loop(rid, "motion", self.cfg.tick_motion)))
+            if "humidity" in room.sensors:
+                self._tasks.append(asyncio.create_task(self._sensor_loop(rid, "humidity", 3.0)))
         self._tasks.append(asyncio.create_task(self._environment_loop(0.5)))
 
     async def stop(self) -> None:
@@ -194,9 +211,9 @@ class Simulation:
                 break
 
     def _step_env(self, room: Room) -> None:
-        # Temperature dynamics: drift toward thermostat setpoint; fan accelerates cooling
-        setpoint = float(room.actuators["thermostat"].state.get("setpoint", 24.0))
-        fan_on = bool(room.actuators["fan"].state.get("on", False))
+        # Temperature dynamics: drift toward thermostat setpoint; fan accelerates cooling (if room has thermostat/fan)
+        setpoint = float(room.actuators.get("thermostat", Thermostat(id="_", name="_", kind="actuator", state={"setpoint": room.env.get("temp", 24.0)})).state.get("setpoint", 24.0))
+        fan_on = bool(room.actuators.get("fan", Fan(id="_", name="_", kind="actuator", state={"on": False})).state.get("on", False))
         temp = float(room.env.get("temp", 24.0))
         delta = (setpoint - temp) * (0.01 if not fan_on else 0.03)
         temp += delta + random.uniform(-0.05, 0.05)
@@ -216,6 +233,14 @@ class Simulation:
         # Motion probability drifts slightly
         mp = float(room.env.get("motion_prob", 0.12))
         room.env["motion_prob"] = max(0.02, min(0.5, mp + random.uniform(-0.01, 0.01)))
+
+        # Humidity slow drift toward target (depends on time of day slightly)
+        if "humidity" in room.env:
+            hour = time.localtime().tm_hour
+            target_h = 45.0 if 10 <= hour <= 18 else 50.0
+            h = float(room.env.get("humidity", 50.0))
+            h += (target_h - h) * 0.02 + random.uniform(-0.3, 0.3)
+            room.env["humidity"] = max(0.0, min(100.0, h))
 
     async def _apply_rules(self, room_id: str, sensor_id: str, reading: Reading) -> None:
         room = self.rooms[room_id]

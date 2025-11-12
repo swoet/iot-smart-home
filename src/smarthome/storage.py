@@ -108,6 +108,14 @@ class EventStore:
             "SELECT ts, value FROM readings WHERE room=? AND device_id=? ORDER BY ts DESC LIMIT ?",
             (room, sensor_id, limit),
         ).fetchall()
-        # reverse chronological to chronological
         rows.reverse()
+        return [(float(ts), json.loads(val)) for ts, val in rows]
+
+    def query_readings_since(self, room: str, sensor_id: str, since_ts: float) -> List[Tuple[float, Any]]:
+        self._connect()
+        cur = self._conn.cursor()
+        rows = cur.execute(
+            "SELECT ts, value FROM readings WHERE room=? AND device_id=? AND ts>=? ORDER BY ts ASC",
+            (room, sensor_id, since_ts),
+        ).fetchall()
         return [(float(ts), json.loads(val)) for ts, val in rows]

@@ -53,6 +53,17 @@ class MotionSensor(Sensor):
 
 
 @dataclass
+class HumiditySensor(Sensor):
+    metric: str = "humidity"
+
+    def read(self, env: Dict[str, Any]) -> float:
+        base = float(env.get("humidity", 45.0))
+        noise = random.uniform(-1.0, 1.0)
+        v = max(0.0, min(100.0, base + noise))
+        return round(v, 1)
+
+
+@dataclass
 class Actuator(Device):
     state: Dict[str, Any] = field(default_factory=dict)
 
@@ -76,6 +87,12 @@ class LightBulb(Actuator):
 @dataclass
 class Thermostat(Actuator):
     # state: {"setpoint": float}
+    pass
+
+
+@dataclass
+class SmartPlug(Actuator):
+    # state: {"on": bool}
     pass
 
 

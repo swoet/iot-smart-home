@@ -22,26 +22,70 @@
   </nav>
 
   <main class="max-w-6xl mx-auto p-4 space-y-6">
-    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div class="bg-white rounded-lg shadow p-4">
-        <div class="text-sm text-slate-500">Temperature</div>
+        <div class="text-sm text-slate-500 flex justify-between items-center">
+          <span>Temperature</span>
+          <select id="temp-range" class="text-xs border rounded px-1">
+            <option value="15m">15m</option>
+            <option value="1h" selected>1h</option>
+            <option value="24h">24h</option>
+          </select>
+        </div>
         <div class="mt-1 text-3xl font-bold"><span id="temp-val">--</span> °C</div>
         <canvas id="temp-chart" class="mt-4"></canvas>
       </div>
 
       <div class="bg-white rounded-lg shadow p-4">
-        <div class="text-sm text-slate-500">Light</div>
+        <div class="text-sm text-slate-500 flex justify-between items-center">
+          <span>Light</span>
+          <select id="light-range" class="text-xs border rounded px-1">
+            <option value="15m">15m</option>
+            <option value="1h" selected>1h</option>
+            <option value="24h">24h</option>
+          </select>
+        </div>
         <div class="mt-1 text-3xl font-bold"><span id="light-val">--</span> %</div>
+        <canvas id="light-chart" class="mt-4"></canvas>
       </div>
 
       <div class="bg-white rounded-lg shadow p-4">
-        <div class="text-sm text-slate-500">Motion</div>
+        <div class="text-sm text-slate-500 flex justify-between items-center">
+          <span>Motion</span>
+          <select id="motion-range" class="text-xs border rounded px-1">
+            <option value="15m">15m</option>
+            <option value="1h" selected>1h</option>
+            <option value="24h">24h</option>
+          </select>
+        </div>
         <div class="mt-1 text-3xl font-bold"><span id="motion-val">--</span></div>
+        <canvas id="motion-chart" class="mt-4"></canvas>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-4" id="humidity-card" style="display:none">
+        <div class="text-sm text-slate-500 flex justify-between items-center">
+          <span>Humidity</span>
+          <select id="humidity-range" class="text-xs border rounded px-1">
+            <option value="15m">15m</option>
+            <option value="1h" selected>1h</option>
+            <option value="24h">24h</option>
+          </select>
+        </div>
+        <div class="mt-1 text-3xl font-bold"><span id="humidity-val">--</span> %</div>
+        <canvas id="humidity-chart" class="mt-4"></canvas>
       </div>
     </section>
 
-    <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div class="bg-white rounded-lg shadow p-4 flex items-center justify-between">
+    <section class="bg-white rounded-lg shadow p-4" id="thermostat-card" style="display:none">
+      <div class="text-sm text-slate-500">Thermostat Setpoint</div>
+      <div class="mt-2 flex items-center gap-4">
+        <input id="thermostat-slider" type="range" min="18" max="30" step="0.5" value="24" class="flex-1" />
+        <span id="thermostat-val" class="text-2xl font-semibold">24.0°C</span>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white rounded-lg shadow p-4 flex items-center justify-between" id="fan-card" style="display:none">
         <div>
           <div class="text-sm text-slate-500">Fan</div>
           <div id="fan-state" class="text-xl font-semibold">OFF</div>
@@ -49,12 +93,31 @@
         <button id="fan-toggle" class="px-4 py-2 rounded bg-slate-900 text-white hover:bg-slate-700">Toggle</button>
       </div>
 
-      <div class="bg-white rounded-lg shadow p-4 flex items-center justify-between">
+      <div class="bg-white rounded-lg shadow p-4 flex items-center justify-between" id="bulb-card">
         <div>
           <div class="text-sm text-slate-500">Lightbulb</div>
           <div id="bulb-state" class="text-xl font-semibold">OFF</div>
         </div>
         <button id="bulb-toggle" class="px-4 py-2 rounded bg-slate-900 text-white hover:bg-slate-700">Toggle</button>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-4 flex items-center justify-between" id="plug-card" style="display:none">
+        <div>
+          <div class="text-sm text-slate-500">Smart Plug</div>
+          <div id="plug-state" class="text-xl font-semibold">OFF</div>
+        </div>
+        <button id="plug-toggle" class="px-4 py-2 rounded bg-slate-900 text-white hover:bg-slate-700">Toggle</button>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-lg shadow p-4">
+      <div class="text-sm text-slate-500 mb-2">Export Sensor Data</div>
+      <div class="flex gap-2 flex-wrap">
+        <button class="export-btn px-3 py-1.5 rounded border text-sm" data-sensor="temp" data-format="csv">Temp (CSV)</button>
+        <button class="export-btn px-3 py-1.5 rounded border text-sm" data-sensor="light" data-format="csv">Light (CSV)</button>
+        <button class="export-btn px-3 py-1.5 rounded border text-sm" data-sensor="motion" data-format="csv">Motion (CSV)</button>
+        <button class="export-btn px-3 py-1.5 rounded border text-sm" data-sensor="humidity" data-format="csv" style="display:none" id="export-humidity-csv">Humidity (CSV)</button>
+        <button class="export-btn px-3 py-1.5 rounded border text-sm" data-sensor="temp" data-format="json">Temp (JSON)</button>
       </div>
     </section>
   </main>
@@ -86,16 +149,35 @@
     const roomSelect = document.getElementById('room-select');
 
     const tempCtx = document.getElementById('temp-chart').getContext('2d');
+    const lightCtx = document.getElementById('light-chart').getContext('2d');
+    const motionCtx = document.getElementById('motion-chart').getContext('2d');
+    const humidityCanvas = document.getElementById('humidity-chart');
+    const humidityCtx = humidityCanvas ? humidityCanvas.getContext('2d') : null;
+
     const tempDatasetsByRoom = {};
+    const lightDatasetsByRoom = {};
+    const motionDatasetsByRoom = {};
+    const humidityDatasetsByRoom = {};
+
     const tempChart = new Chart(tempCtx, { type: 'line', data: { labels: [], datasets: [] }, options: { animation: false, scales: { x: { display: false } } } });
+    const lightChart = new Chart(lightCtx, { type: 'line', data: { labels: [], datasets: [] }, options: { animation: false, scales: { x: { display: false }, y: { min: 0, max: 100 } } } });
+    const motionChart = new Chart(motionCtx, { type: 'bar', data: { labels: [], datasets: [] }, options: { animation: false, scales: { x: { display: false }, y: { min: 0, max: 1 } } } });
+    const humidityChart = humidityCtx ? new Chart(humidityCtx, { type: 'line', data: { labels: [], datasets: [] }, options: { animation: false, scales: { x: { display: false }, y: { min: 0, max: 100 } } } }) : null;
 
     let currentRoom = null;
 
-    function ensureRoomDataset(room) {
-      if (!tempDatasetsByRoom[room]) {
-        tempDatasetsByRoom[room] = { label: `${room} Temp`, data: [], borderColor: 'rgb(15, 23, 42)', tension: 0.25 };
-        tempChart.data.datasets.push(tempDatasetsByRoom[room]);
+    function ensureDataset(map, chart, room, label) {
+      if (!map[room]) {
+        map[room] = { label, data: [], borderColor: 'rgb(15, 23, 42)', backgroundColor: 'rgba(15,23,42,0.2)', tension: 0.25 };
+        chart.data.datasets.push(map[room]);
       }
+    }
+
+    function ensureRoomDataset(room) {
+      ensureDataset(tempDatasetsByRoom, tempChart, room, `${room} Temp`);
+      ensureDataset(lightDatasetsByRoom, lightChart, room, `${room} Light`);
+      ensureDataset(motionDatasetsByRoom, motionChart, room, `${room} Motion`);
+      if (humidityChart) ensureDataset(humidityDatasetsByRoom, humidityChart, room, `${room} Humidity`);
     }
 
     function setOnOff(el, on) {
@@ -119,6 +201,21 @@
       if (!currentRoom) return;
       const on = bulbStateEl.textContent.trim() !== 'ON';
       await postActuator(currentRoom, 'lightbulb', { on });
+    });
+
+    document.getElementById('plug-toggle').addEventListener('click', async () => {
+      if (!currentRoom) return;
+      const on = document.getElementById('plug-state').textContent.trim() !== 'ON';
+      await postActuator(currentRoom, 'plug', { on });
+    });
+
+    const thermoSlider = document.getElementById('thermostat-slider');
+    thermoSlider.addEventListener('input', () => {
+      document.getElementById('thermostat-val').textContent = `${Number(thermoSlider.value).toFixed(1)}°C`;
+    });
+    thermoSlider.addEventListener('change', async () => {
+      if (!currentRoom) return;
+      await postActuator(currentRoom, 'thermostat', { setpoint: Number(thermoSlider.value) });
     });
 
     // Rules modal
@@ -159,8 +256,15 @@
         if (currentRoom) roomSelect.value = currentRoom;
       }
       updateUIForRoom(currentRoom, rooms[currentRoom] || {});
-      // Load history for current room
-      if (currentRoom) loadHistory(currentRoom, 'temp');
+      // Load history for current room (all charts)
+      if (currentRoom) {
+        loadHistory(currentRoom, 'temp', document.getElementById('temp-range').value);
+        loadHistory(currentRoom, 'light', document.getElementById('light-range').value);
+        loadHistory(currentRoom, 'motion', document.getElementById('motion-range').value);
+        if (document.getElementById('humidity-card').style.display !== 'none') {
+          loadHistory(currentRoom, 'humidity', document.getElementById('humidity-range').value);
+        }
+      }
     }
 
     roomSelect.addEventListener('change', () => {
@@ -168,32 +272,56 @@
       fetch('/api/state').then(r => r.json()).then(s => {
         const rooms = s.rooms || {};
         updateUIForRoom(currentRoom, rooms[currentRoom] || {});
-        loadHistory(currentRoom, 'temp');
+        loadHistory(currentRoom, 'temp', document.getElementById('temp-range').value);
+        loadHistory(currentRoom, 'light', document.getElementById('light-range').value);
+        loadHistory(currentRoom, 'motion', document.getElementById('motion-range').value);
+        if (document.getElementById('humidity-card').style.display !== 'none') {
+          loadHistory(currentRoom, 'humidity', document.getElementById('humidity-range').value);
+        }
       });
     });
 
     function updateUIForRoom(room, rstate) {
       const sensors = rstate.sensors || {};
       const actuators = rstate.actuators || {};
+      document.getElementById('fan-card').style.display = actuators.fan ? '' : 'none';
+      document.getElementById('thermostat-card').style.display = actuators.thermostat ? '' : 'none';
+      document.getElementById('plug-card').style.display = actuators.plug ? '' : 'none';
+      const hasHumidity = !!sensors.humidity;
+      document.getElementById('humidity-card').style.display = hasHumidity ? '' : 'none';
+      document.getElementById('export-humidity-csv').style.display = hasHumidity ? '' : 'none';
+
       if (sensors.temp?.reading) updateTemp(room, sensors.temp.reading.value);
       if (sensors.light?.reading) updateLight(sensors.light.reading.value);
       if (sensors.motion?.reading) updateMotion(sensors.motion.reading.value);
+      if (sensors.humidity?.reading) updateHumidity(room, sensors.humidity.reading.value);
       if (actuators.fan?.state) setOnOff(fanStateEl, !!actuators.fan.state.on);
       if (actuators.lightbulb?.state) setOnOff(bulbStateEl, !!actuators.lightbulb.state.on);
+      if (actuators.plug?.state) setOnOff(document.getElementById('plug-state'), !!actuators.plug.state.on);
+      if (actuators.thermostat?.state) {
+        const sp = Number(actuators.thermostat.state.setpoint || 24);
+        document.getElementById('thermostat-slider').value = sp;
+        document.getElementById('thermostat-val').textContent = `${sp.toFixed(1)}°C`;
+      }
     }
 
-    async function loadHistory(room, sensorId) {
-      const res = await fetch(`/api/history?room=${room}&sensor_id=${sensorId}&limit=200`);
+    async function loadHistory(room, sensorId, window='1h') {
+      const res = await fetch(`/api/history?room=${room}&sensor_id=${sensorId}&window=${window}`);
       const data = await res.json();
-      const series = tempDatasetsByRoom[room];
-      if (!series) return;
-      tempChart.data.labels = [];
+      const chartMap = { temp: [tempChart, tempDatasetsByRoom], light: [lightChart, lightDatasetsByRoom], motion: [motionChart, motionDatasetsByRoom], humidity: [humidityChart, humidityDatasetsByRoom] };
+      const entry = chartMap[sensorId];
+      if (!entry) return;
+      const [chart, map] = entry;
+      if (!chart) return;
+      ensureRoomDataset(room);
+      const series = map[room];
+      chart.data.labels = [];
       series.data.length = 0;
       data.points.forEach(([ts, v]) => {
-        tempChart.data.labels.push(new Date(ts * 1000).toLocaleTimeString());
-        series.data.push(v);
+        chart.data.labels.push(new Date(ts * 1000).toLocaleTimeString());
+        series.data.push(sensorId === 'motion' ? (v ? 1 : 0) : v);
       });
-      tempChart.update();
+      chart.update();
     }
 
     function updateTemp(room, v) {
@@ -212,14 +340,52 @@
       tempChart.update();
     }
 
-    function updateLight(v) {
-      lightEl.textContent = Number(v).toFixed(1);
-    }
+    function updateLight(v) { lightEl.textContent = Number(v).toFixed(1); }
 
     function updateMotion(v) {
       motionEl.textContent = v ? 'MOTION' : 'No motion';
       motionEl.classList.toggle('text-green-600', !!v);
+      const now = new Date();
+      if (motionChart.data.labels.length > 100) { motionChart.data.labels.shift(); motionChart.data.datasets.forEach(d => d.data.shift()); }
+      if (motionChart.data.labels.length === 0 || motionChart.data.labels[motionChart.data.labels.length - 1] !== now.toLocaleTimeString()) {
+        motionChart.data.labels.push(now.toLocaleTimeString());
+      }
+      ensureRoomDataset(currentRoom);
+      motionDatasetsByRoom[currentRoom].data.push(v ? 1 : 0);
+      motionChart.update();
     }
+
+    function updateHumidity(room, v) {
+      document.getElementById('humidity-val').textContent = Number(v).toFixed(1);
+      if (!humidityChart) return;
+      const now = new Date();
+      if (humidityChart.data.labels.length > 100) { humidityChart.data.labels.shift(); humidityChart.data.datasets.forEach(d => d.data.shift()); }
+      if (humidityChart.data.labels.length === 0 || humidityChart.data.labels[humidityChart.data.labels.length - 1] !== now.toLocaleTimeString()) {
+        humidityChart.data.labels.push(now.toLocaleTimeString());
+      }
+      ensureRoomDataset(room);
+      humidityDatasetsByRoom[room].data.push(v);
+      humidityChart.update();
+    }
+
+    // Range change handlers
+    document.getElementById('temp-range').addEventListener('change', (e) => { if (currentRoom) loadHistory(currentRoom, 'temp', e.target.value); });
+    document.getElementById('light-range').addEventListener('change', (e) => { if (currentRoom) loadHistory(currentRoom, 'light', e.target.value); });
+    document.getElementById('motion-range').addEventListener('change', (e) => { if (currentRoom) loadHistory(currentRoom, 'motion', e.target.value); });
+    const humRange = document.getElementById('humidity-range');
+    if (humRange) humRange.addEventListener('change', (e) => { if (currentRoom) loadHistory(currentRoom, 'humidity', e.target.value); });
+
+    // Export buttons
+    document.querySelectorAll('.export-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!currentRoom) return;
+        const sensor = btn.dataset.sensor;
+        const format = btn.dataset.format;
+        const win = (sensor === 'temp') ? document.getElementById('temp-range').value : (sensor === 'light' ? document.getElementById('light-range').value : (sensor === 'motion' ? document.getElementById('motion-range').value : document.getElementById('humidity-range').value));
+        const url = `/api/export?room=${currentRoom}&sensor_id=${sensor}&window=${win}&format=${format}`;
+        window.open(url, '_blank');
+      });
+    });
 
     function handleEvent(evt) {
       if (evt.type === 'reading') {
@@ -228,11 +394,18 @@
         if (evt.device_id === 'temp') updateTemp(evt.room, evt.value);
         if (evt.device_id === 'light') updateLight(evt.value);
         if (evt.device_id === 'motion') updateMotion(!!evt.value);
+        if (evt.device_id === 'humidity') updateHumidity(evt.room, evt.value);
       }
       if (evt.type === 'actuator') {
         if (!currentRoom || evt.room !== currentRoom) return;
         if (evt.device_id === 'fan') setOnOff(fanStateEl, !!evt.value);
         if (evt.device_id === 'lightbulb') setOnOff(bulbStateEl, !!evt.value);
+        if (evt.device_id === 'plug') setOnOff(document.getElementById('plug-state'), !!evt.value);
+        if (evt.device_id === 'thermostat' && evt.metric === 'setpoint') {
+          const sp = Number(evt.value);
+          document.getElementById('thermostat-slider').value = sp;
+          document.getElementById('thermostat-val').textContent = `${sp.toFixed(1)}°C`;
+        }
       }
     }
 

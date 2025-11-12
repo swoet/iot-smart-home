@@ -59,9 +59,39 @@ async def get_rooms() -> Dict[str, Any]:
     return {"rooms": {rid: v["name"] for rid, v in s["rooms"].items()}}
 
 
+def _parse_window(window: str | None) -> float | None:
+    if not window:
+        return None
+    window = window.strip().lower()
+    mult = 1
+    if window.endswith("m"):
+        mult = 60
+        n = window[:-1]
+    elif window.endswith("h"):
+        mult = 3600
+        n = window[:-1]
+    elif window.endswith("d"):
+        mult = 86400
+        n = window[:-1]
+    else:
+        try:
+            return float(window)
+        except Exception:
+            return None
+    try:
+        return float(n) * mult
+    except Exception:
+        return None
+
+
 @app.get("/api/history")
-async def get_history(room: str, sensor_id: str, limit: int = 300) -> Dict[str, Any]:
-    points = store.query_readings(room, sensor_id, limit=limit)
+async def get_history(room: str, sensor_id: str, limit: int = 300, window: str | None = None) -> Dict[str, Any]:
+    import time
+    since = _parse_window(window)
+    if since:
+        points = store.query_readings_since(room, sensor_id, since_ts=time.time() - since)
+    else:
+        points = store.query_readings(room, sensor_id, limit=limit)
     return {"room": room, "sensor_id": sensor_id, "points": points}
 
 
@@ -87,6 +117,23 @@ async def put_rules(content: str = Body(..., media_type="text/plain")) -> JSONRe
         return JSONResponse({"ok": True})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+
+@app.get("/api/export")
+async def export_history(room: str, sensor_id: str, window: str = "1h", format: str = "csv"):
+    import time
+    since = _parse_window(window) or 3600
+    points = store.query_readings_since(room, sensor_id, since_ts=time.time() - since)
+    if format.lower() == "json":
+        return JSONResponse({"room": room, "sensor_id": sensor_id, "window": window, "points": points})
+    # CSV
+    import datetime
+    lines = ["ts_iso,ts,room,sensor_id,metric,value"]
+    for ts, val in points:
+        iso = datetime.datetime.utcfromtimestamp(ts).isoformat() + "Z"
+        lines.append(f"{iso},{ts},{room},{sensor_id},reading,{val}")
+    csv = "\n".join(lines) + "\n"
+    return PlainTextResponse(csv, media_type="text/csv")
 
 
 @app.websocket("/ws")
