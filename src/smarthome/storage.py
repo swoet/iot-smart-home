@@ -119,3 +119,12 @@ class EventStore:
             (room, sensor_id, since_ts),
         ).fetchall()
         return [(float(ts), json.loads(val)) for ts, val in rows]
+
+    def query_readings_between(self, room: str, sensor_id: str, start_ts: float, end_ts: float) -> List[Tuple[float, Any]]:
+        self._connect()
+        cur = self._conn.cursor()
+        rows = cur.execute(
+            "SELECT ts, value FROM readings WHERE room=? AND device_id=? AND ts>=? AND ts<=? ORDER BY ts ASC",
+            (room, sensor_id, start_ts, end_ts),
+        ).fetchall()
+        return [(float(ts), json.loads(val)) for ts, val in rows]

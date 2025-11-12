@@ -85,13 +85,23 @@ def _parse_window(window: str | None) -> float | None:
 
 
 @app.get("/api/history")
-async def get_history(room: str, sensor_id: str, limit: int = 300, window: str | None = None) -> Dict[str, Any]:
+async def get_history(
+    room: str,
+    sensor_id: str,
+    limit: int = 300,
+    window: str | None = None,
+    start: Optional[float] = None,
+    end: Optional[float] = None,
+) -> Dict[str, Any]:
     import time
-    since = _parse_window(window)
-    if since:
-        points = store.query_readings_since(room, sensor_id, since_ts=time.time() - since)
+    if start is not None and end is not None:
+        points = store.query_readings_between(room, sensor_id, start_ts=float(start), end_ts=float(end))
     else:
-        points = store.query_readings(room, sensor_id, limit=limit)
+        since = _parse_window(window)
+        if since:
+            points = store.query_readings_since(room, sensor_id, since_ts=time.time() - since)
+        else:
+            points = store.query_readings(room, sensor_id, limit=limit)
     return {"room": room, "sensor_id": sensor_id, "points": points}
 
 
@@ -120,18 +130,61 @@ async def put_rules(content: str = Body(..., media_type="text/plain")) -> JSONRe
 
 
 @app.get("/api/export")
-async def export_history(room: str, sensor_id: str, window: str = "1h", format: str = "csv"):
-    import time
-    since = _parse_window(window) or 3600
-    points = store.query_readings_since(room, sensor_id, since_ts=time.time() - since)
+async def export_history(
+    room: str,
+    sensor_id: str,
+    window: str = "1h",
+    format: str = "csv",
+    start: Optional[float] = None,
+    end: Optional[float] = None,
+):
+    import time, datetime
+    if start is not None and end is not None:
+        points = store.query_readings_between(room, sensor_id, start_ts=float(start), end_ts=float(end))
+    else:
+        since = _parse_window(window) or 3600
+        points = store.query_readings_since(room, sensor_id, since_ts=time.time() - since)
     if format.lower() == "json":
-        return JSONResponse({"room": room, "sensor_id": sensor_id, "window": window, "points": points})
+        return JSONResponse({"room": room, "sensor_id": sensor_id, "window": window, "start": start, "end": end, "points": points})
     # CSV
-    import datetime
     lines = ["ts_iso,ts,room,sensor_id,metric,value"]
     for ts, val in points:
         iso = datetime.datetime.utcfromtimestamp(ts).isoformat() + "Z"
         lines.append(f"{iso},{ts},{room},{sensor_id},reading,{val}")
+    csv = "\n".join(lines) + "\n"
+    return PlainTextResponse(csv, media_type="text/csv")
+
+
+@app.get("/api/export_all")
+async def export_all(
+    room: str,
+    window: str = "1h",
+    format: str = "csv",
+    start: Optional[float] = None,
+    end: Optional[float] = None,
+):
+    import time, datetime
+    # Determine sensors present in room
+    if room not in sim.rooms:
+        return JSONResponse({"error": "unknown room"}, status_code=404)
+    sensors = list(sim.rooms[room].sensors.keys())
+    data = {}
+    if start is not None and end is not None:
+        for sid in sensors:
+            data[sid] = store.query_readings_between(room, sid, start_ts=float(start), end_ts=float(end))
+    else:
+        since = _parse_window(window) or 3600
+        cutoff = time.time() - since
+        for sid in sensors:
+            data[sid] = store.query_readings_since(room, sid, since_ts=cutoff)
+    if format.lower() == "json":
+        return JSONResponse({"room": room, "window": window, "start": start, "end": end, "data": data})
+    # CSV (long format)
+    lines = ["ts_iso,ts,room,sensor_id,metric,value"]
+    for sid, points in data.items():
+        for ts, val in points:
+            iso = datetime.datetime.utcfromtimestamp(ts).isoformat() + "Z"
+            lines.append(f"{iso},{ts},{room},{sid},reading,{val}")
     csv = "\n".join(lines) + "\n"
     return PlainTextResponse(csv, media_type="text/csv")
 
