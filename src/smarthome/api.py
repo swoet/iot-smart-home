@@ -14,7 +14,7 @@ from .storage import EventStore
 from .rules import Rules
 
 configure_logging()
-app = FastAPI(title="SmartHome Simulation", version="0.1.0")
+app = FastAPI(title="SmartHome Simulation", version="0.2.0")
 
 # Singletons
 cfg = load_config(None)
